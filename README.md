@@ -1,6 +1,6 @@
 # safe-rm-guard
 
-A [Claude Code](https://docs.claude.com/claude-code) `PreToolUse` hook that blocks dangerous recursive deletes (`rm -rf` and friends) — **without** the false positives that plague naive keyword/regex detectors.
+A [Claude Code](https://docs.claude.com/claude-code) `PreToolUse` hook that blocks dangerous recursive deletes (`rm -rf` and friends), **without** the false positives that plague naive keyword/regex detectors.
 
 > A guardrail, not a roadblock: it stops the catastrophic deletes and stays out of your way for everything else.
 
@@ -12,15 +12,15 @@ A common way to write a "block dangerous `rm`" hook is a greedy regex like:
 \brm\s+.*-[a-z]*r[a-z]*f
 ```
 
-That `\brm` matches the **letters** "rm" anywhere on the line, and the unanchored `.*` lets any later `-…r…f`-shaped token complete the match — even when that token belongs to a *different* command. The result is a hook that blocks safe, everyday commands:
+That `\brm` matches the **letters** "rm" anywhere on the line, and the unanchored `.*` lets any later `-…r…f`-shaped token complete the match, even when that token belongs to a *different* command. The result is a hook that blocks safe, everyday commands:
 
 | Command | Naive greedy hook | Reality |
 |---|---|---|
-| `rm one.log; grep -rf "pat" .` | ❌ blocked | safe — a single-file delete + a recursive grep |
-| `rm a.txt && tar -rf archive.tar b.txt` | ❌ blocked | safe — `tar -rf` appends to an archive |
-| `echo "backup (rm is hook-blocked); cp only"; cp a b` | ❌ blocked | safe — there is **no `rm` at all**, only the letters "rm" in a comment |
+| `rm one.log; grep -rf "pat" .` | ❌ blocked | safe: a single-file delete + a recursive grep |
+| `rm a.txt && tar -rf archive.tar b.txt` | ❌ blocked | safe: `tar -rf` appends to an archive |
+| `echo "backup (rm is hook-blocked); cp only"; cp a b` | ❌ blocked | safe: there is **no `rm` at all**, only the letters "rm" in a comment |
 
-That last row is real. A backup script that *deliberately used `cp`* instead of `rm` was blocked anyway — because it *mentioned* "rm" in an echo and happened to contain `-first` (from a `print('R-first:')`) later on the same line. Two innocent fragments, combined by a greedy `.*`, looked like `rm … -…f`.
+That last row is real. A backup script that *deliberately used `cp`* instead of `rm` was blocked anyway, because it *mentioned* "rm" in an echo and happened to contain `-first` (from a `print('R-first:')`) later on the same line. Two innocent fragments, combined by a greedy `.*`, looked like `rm … -…f`.
 
 ## How it works
 
@@ -28,7 +28,7 @@ That last row is real. A backup script that *deliberately used `cp`* instead of 
 
 1. Split the command on shell separators (`;`, `&`, `|`, newline, backtick) and command-substitution openers (`$(`).
 2. In each segment, find the **command word** (skipping `sudo` and `VAR=value` prefixes).
-3. Flag the segment only if its command word is `rm` — or `rm` invoked via `find -exec`/`-execdir`/`xargs` — **and** it is recursive **and** forced (`-rf` in any spelling), or a recursive delete aimed at a broad path (`/`, `~`, `.`, `*`, …).
+3. Flag the segment only if its command word is `rm` (or `rm` invoked via `find -exec`/`-execdir`/`xargs`) **and** it is recursive **and** forced (`-rf` in any spelling), or a recursive delete aimed at a broad path (`/`, `~`, `.`, `*`, …).
 
 Because each segment must actually *be* an `rm` command, the word "rm" in an echo, or a flag from a neighbouring command, can never trigger it.
 
@@ -88,9 +88,9 @@ python test_safe_rm_guard.py
 ## Design notes
 
 - **Fails open.** A hook that crashes or sees malformed input must never block your work, so it exits `0` on anything it can't parse.
-- **Defense in depth, not a sandbox.** It catches the common catastrophic forms (`rm -rf`, broad-path recursive, compound, subshell, `find`/`xargs`-wrapped). It is intentionally *not* a complete adversarial sandbox — heavily obfuscated deletes can still get through. Pair it with real backups and least-privilege.
+- **Defense in depth, not a sandbox.** It catches the common catastrophic forms (`rm -rf`, broad-path recursive, compound, subshell, `find`/`xargs`-wrapped). It is intentionally *not* a complete adversarial sandbox. Heavily obfuscated deletes can still get through. Pair it with real backups and least-privilege.
 - **No dependencies.** Pure standard-library Python 3.8+.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
